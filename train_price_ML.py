@@ -25,13 +25,14 @@ gpu_options = tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.333)
 sess = tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(gpu_options=gpu_options))
 
 
+#PONIŻSZE ZMIENNE NALEŻY GDZIEŚ UKRYĆ, BO SĄ WYWOŁYWANE ZAWSZE W MAINIE!
 MODEL_NAME = 'Price_ML'
 BATCH_SIZE = 16                         #int podzielny przez 8 
 EPOCH = 7     
 
 HISTORY_POINTS = 15                     # liczba punktów na krzywej nastroju brana pod uwagę, służąca za wejście
-UP_PRICE_CHANGE = 1.005                  # np 1.01
-DOWN_PRICE_CHANGE = 0.995
+UP_PRICE_CHANGE = 1.05                  # np 1.01
+DOWN_PRICE_CHANGE = 0.95
 FUTURE_PERIOD_PREDICT = 2               # [2h]
 
 
@@ -123,8 +124,7 @@ def preprocess_scores(df):
     df.dropna(inplace=True)
 
     # Szeregi czasowe:
-    sequential_data = get_timeseries_batches(df, target=target)
-    # df_final = pd.DataFrame(sequential_data, columns=['series','buy_now'])
+    sequential_data = get_timeseries_batches(df, target=target) 
     return sequential_data
     # Utworzenie zbioru danych. Wartosci wyjsciowe: df['series'] tabela wejsc, db[buy_now']
 
@@ -200,27 +200,33 @@ def train(dirs, model, train_ds, val_ds):
 #==main
 def perform_machine_learning(dirs, selected_files_tuples):
     rprint(f'[italic red] Scores per timeseries: {HISTORY_POINTS} [/italic red]')
-    df = pd.DataFrame()
+    # df_train = pd.DataFrame()
+    # df_val = pd.DataFrame()
+    train_set = []
+    val_set = []
     for ft in selected_files_tuples:
         scores_fpath = os.path.join(dirs['selected_scores'], ft[0])
         new_df, crypto_scores_weight = get_scores(dirs, scores_fpath, ft[1])
-        df = pd.concat([df, new_df])
 
-        crypto_name = ft[1].split('_usd')[0]
-        print(f'{crypto_name.upper()} - \tPeriods: {len(new_df)} \tPeriods weight (mean): {crypto_scores_weight:.2f}')
-    
-    train_df, val_df = train_test_split(df, test_size=0.2)
-    train_ds = preprocess_scores(train_df)
-    val_ds = preprocess_scores(val_df)
-    
-    train_ds = to_numpy_tuple(train_ds)
-    val_ds = to_numpy_tuple(val_ds)
+        train_new, val_new = train_test_split(new_df, test_size=0.2)
+        train_new = preprocess_scores(train_new)
+        val_new = preprocess_scores(val_new)
+        train_set = [*train_set, *train_new]
+        val_set = [*val_set, *val_new]
+        # df_train = pd.concat([df_train, new_df_train])
+        # df_train = pd.concat([df_train, new_df_val])
 
-    model = scores_series_model2(train_ds)
+        # crypto_name = ft[1].split('_usd')[0]
+        # print(f'{crypto_name.upper()} - \tPeriods: {len(new_df)} \tPeriods weight (mean): {crypto_scores_weight:.2f}')
+    
+    train_set = to_numpy_tuple(train_set)
+    val_set = to_numpy_tuple(val_set)
+
+    model = scores_series_model2(train_set)
     opt = setting_optimizer()
     # LOSS FUNCTION: OneHot encoding: categorical_crossentropy,  1d encoding: sparse_categorical_crossentropy
     model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['acc'])
-    train(dirs, model, train_ds, val_ds)
+    train(dirs, model, train_set, val_set)
 
 
 def load_trained_model(model_dir, model_filename):
