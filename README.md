@@ -1,2 +1,2 @@
 # PriceML
-LSTM model for cryptocurrency price prediction
+LSTM timeseries model for cryptocurrency price prediction.
